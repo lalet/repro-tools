@@ -32,18 +32,16 @@ def get_dir_dict(directory,exclude_items):
 	    #To eliminate the files listd in exclude items file. Condition below checks relative file path as well as file names. 
             files[:]=[f for f in files if f not in exclude_items and os.path.join(root,f).replace(os.path.join(directory+"/"),"") not in exclude_items]
         for file_name in files:
-            if (f in exclude_items for f in file_name.split(".")):
+            if (file_name.split("/")[-1] in exclude_items):
+               log_info("Removing: "+file_name+" since it is a file to be excluded")
                files.remove(file_name)
         for file_name in files:
 	    if (file_name not in exclude_items and os.path.splitext(file_name)[1] not in exclude_items):
-                if (os.path.splitext(file_name)[1])==".gz":
-                    nii_files+=1
                 abs_file_path=os.path.join(root,file_name)
                 rel_path=abs_file_path.replace(os.path.join(directory+"/"),"")
                 if '/' in rel_path and directory.split('/')[-1] in rel_path:
                     rel_path=rel_path.replace(directory.split('/')[-1],"subject_name")
                 result_dict[rel_path]=os.stat(abs_file_path)
-    print("nii_files :"+ str(nii_files))
     return result_dict
 
 # Returns a dictionary where the keys are the directories in
@@ -256,7 +254,7 @@ def n_differences_across_subjects(conditions_dict,root_dir,metrics,checksums_fro
                         files_are_different=True
 
 		    #Track the processes which created the files using reprozip trace.
-		    if track_processes and sqlite_db_path and file_name not in dictionary_processes and file_name.endswith("nii.gz") :
+                    if track_processes and sqlite_db_path and file_name not in dictionary_processes:#and file_name.endswith("nii.gz") :
 		       dictionary_processes[file_name]=get_executable_details(conn,sqlite_db_path,file_name)    
 		    
                     if files_are_different:
@@ -307,8 +305,9 @@ def n_differences_across_subjects(conditions_dict,root_dir,metrics,checksums_fro
                         # inspect the reprozip trace here to get the
                         # list of executables that created such
                         # differences
-		        if sqlite_db_path and files_are_different and file_name not in dictionary_executables:
+                        if sqlite_db_path and files_are_different and file_name not in dictionary_executables:
 			  #Monitor.txt seems not to have entry in sqlite table
+                           log_info("Finding execution details of file: "+ file_name + "from traced data")
 			   if is_intra_condition_run:
 			     #** indicates that the entries are the result of an intra-condition run
                                if "subject_name" in file_name:
@@ -338,6 +337,7 @@ def get_executable_details(conn,sqlite_db_path,file_name):#TODO Intra condition 
     #FILE_WDIR=4
     #FILE_STAT=8
     #FILE_LINK=16
+    #sqlite_cursor.execute('SELECT * from opened_files')
     sqlite_cursor.execute('SELECT DISTINCT executed_files.name,executed_files.argv,executed_files.envp,executed_files.timestamp,executed_files.workingdir from executed_files INNER JOIN opened_files where opened_files.process = executed_files.process and opened_files.name like ? and opened_files.mode=2 and opened_files.is_directory=0',('%/'+file_name,))
     data = sqlite_cursor.fetchall()
     sqlite_cursor.close()    
@@ -670,4 +670,3 @@ def main():
 
 if __name__=='__main__':
 	main()
-
