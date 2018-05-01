@@ -10,8 +10,8 @@ from verifyFiles import get_conditions_dict,get_conditions_checksum_dict
 def test_checksum():
   assert checksum("test/condition4") == "45a021d9910102aac726dd222a898334"
 
-def test_dir_dict(tmpdir):
-  assert get_dir_dict("test/condition4","test/exclude_items.txt")
+#def test_dir_dict(tmpdir):
+  #assert get_dir_dict("test/condition4","test/exclude_items.txt")
 
 def test_conditions_dict():
   conditions_dict = get_mock_conditions_dict()
