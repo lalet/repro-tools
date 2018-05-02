@@ -337,7 +337,6 @@ def get_executable_details(conn,sqlite_db_path,file_name):#TODO Intra condition 
     #FILE_WDIR=4
     #FILE_STAT=8
     #FILE_LINK=16
-    #sqlite_cursor.execute('SELECT * from opened_files')
     sqlite_cursor.execute('SELECT DISTINCT executed_files.name,executed_files.argv,executed_files.envp,executed_files.timestamp,executed_files.workingdir from executed_files INNER JOIN opened_files where opened_files.process = executed_files.process and opened_files.name like ? and opened_files.mode=2 and opened_files.is_directory=0',('%/'+file_name,))
     data = sqlite_cursor.fetchall()
     sqlite_cursor.close()    
@@ -669,4 +668,4 @@ def main():
 	 
 
 if __name__=='__main__':
-	main()
+    main()
