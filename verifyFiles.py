@@ -25,18 +25,23 @@ import random
 # directories have a trailing '/'.
 def get_dir_dict(directory,exclude_items): 
     result_dict={}
+    nii_files=0
     for root,dirs,files in os.walk(directory):
 	if exclude_items is not None:
 	    dirs[:]=[d for d in dirs if d not in exclude_items]
 	    #To eliminate the files listd in exclude items file. Condition below checks relative file path as well as file names. 
             files[:]=[f for f in files if f not in exclude_items and os.path.join(root,f).replace(os.path.join(directory+"/"),"") not in exclude_items]
         for file_name in files:
-	    if not exclude_items or (file_name not in exclude_items):
-              abs_file_path=os.path.join(root,file_name)
-              rel_path=abs_file_path.replace(os.path.join(directory+"/"),"")
-              if '/' in rel_path and directory.split('/')[-1] in rel_path:
-                  rel_path=rel_path.replace(directory.split('/')[-1],"subject_name")
-              result_dict[rel_path]=os.stat(abs_file_path)
+            if (file_name.split("/")[-1] in exclude_items):
+               log_info("Removing: "+file_name+" since it is a file to be excluded")
+               files.remove(file_name)
+        for file_name in files:
+	    if (file_name not in exclude_items and os.path.splitext(file_name)[1] not in exclude_items):
+                abs_file_path=os.path.join(root,file_name)
+                rel_path=abs_file_path.replace(os.path.join(directory+"/"),"")
+                if '/' in rel_path and directory.split('/')[-1] in rel_path:
+                    rel_path=rel_path.replace(directory.split('/')[-1],"subject_name")
+                result_dict[rel_path]=os.stat(abs_file_path)
     return result_dict
 
 # Returns a dictionary where the keys are the directories in
@@ -130,8 +135,16 @@ def check_files(conditions_dict):
             for subject in conditions_dict[condition].keys():
                 if not path_name in conditions_dict[condition][subject].keys():
                     log_warning("File \"" + path_name  + "\" is missing in subject \"" + subject + "\" of condition \"" + condition + "\".")
-                    if subject in path_name:
-                        del conditions_dict[condition][subject][path_name]
+                    delete_missing_files_from_dict(conditions_dict,path_name)
+                    #if subject in path_name:
+                       # del conditions_dict[condition][subject][path_name]
+
+def delete_missing_files_from_dict(conditions_dict,path_name):
+    for condition in conditions_dict:
+        for subject in conditions_dict[condition]:
+            if path_name in conditions_dict[condition][subject].keys():
+                del conditions_dict[condition][subject][path_name]
+
 
 # Returns a dictionary where the keys identifies two conditions
 # (e.g. "condition1 vs condition2") and the values are dictionaries
@@ -166,6 +179,7 @@ def n_differences_across_subjects(conditions_dict,root_dir,metrics,checksums_fro
     #dictionary_executables is used for tracking the files that we have already found the executables for
     dictionary_executables={}
     dictionary_processes={}
+    metrics_count=0
     #Initialize sqlite connection
     if sqlite_db_path:
       try:
@@ -240,7 +254,7 @@ def n_differences_across_subjects(conditions_dict,root_dir,metrics,checksums_fro
                         files_are_different=True
 
 		    #Track the processes which created the files using reprozip trace.
-		    if track_processes and sqlite_db_path and file_name not in dictionary_processes and file_name.endswith("nii.gz") :
+                    if track_processes and sqlite_db_path and file_name not in dictionary_processes:#and file_name.endswith("nii.gz") :
 		       dictionary_processes[file_name]=get_executable_details(conn,sqlite_db_path,file_name)    
 		    
                     if files_are_different:
@@ -275,6 +289,8 @@ def n_differences_across_subjects(conditions_dict,root_dir,metrics,checksums_fro
 				    try:
 					log_info("Computing the metrics for the file:"+" "+file_name+" "+"in subject"+" "+subject)
 					log_info(file_name +" "+ c +" "+ d +" "+ subject +" "+ metric['command'])
+                                        metrics_count+=1
+                                        log_info("metrics count: "+ str(metrics_count))
                                         #Check the file_name and replace if it has subject_name
                                         if "subject_name" in file_name:
                                             diff_value=float(run_command(metric['command'],file_name_new,c,d,subject,root_dir))
@@ -289,8 +305,9 @@ def n_differences_across_subjects(conditions_dict,root_dir,metrics,checksums_fro
                         # inspect the reprozip trace here to get the
                         # list of executables that created such
                         # differences
-		        if sqlite_db_path and files_are_different and file_name not in dictionary_executables:
+                        if sqlite_db_path and files_are_different and file_name not in dictionary_executables:
 			  #Monitor.txt seems not to have entry in sqlite table
+                           log_info("Finding execution details of file: "+ file_name + "from traced data")
 			   if is_intra_condition_run:
 			     #** indicates that the entries are the result of an intra-condition run
                                if "subject_name" in file_name:
@@ -342,7 +359,7 @@ def get_metrics(metrics,file_name):
 # 'command condition1/subject_name/file_name condition2/subject_name/file_name'
 # and returns the stdout if and only if command was successful
 def run_command(command,file_name,condition1,condition2,subject_name,root_dir):
-    command_string = command+" "+os.path.join(root_dir,condition1,subject_name,file_name)+" "+os.path.join(root_dir,condition2,subject_name,file_name)+" "+"2>/dev/tty"
+    command_string = command+" "+os.path.join(root_dir,condition1,subject_name,file_name)+" "+os.path.join(root_dir,condition2,subject_name,file_name)+" "+"2>/dev/null"
     return_value,output = commands.getstatusoutput(command_string)
     if return_value != 0:
         log_error(str(return_value)+" "+ output +" "+"Command "+ command + " failed (" + command_string + ").")
@@ -651,5 +668,4 @@ def main():
 	 
 
 if __name__=='__main__':
-	main()
-
+    main()
